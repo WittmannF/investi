@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "investi"
+version = "0.1.0"
+description = "Biblioteca para simulação de investimentos financeiros"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Seu Nome", email = "seu.email@exemplo.com"}
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Topic :: Office/Business :: Financial :: Investment",
+]
+requires-python = ">=3.7"
+dependencies = [
+    "pandas>=1.0.0",
+    "matplotlib>=3.0.0",
+    "numpy>=1.18.0",
+    "pytest>=6.0.0",
+    "python-dateutil>=2.8.0",
+    "streamlit>=1.20.0",
+    "plotly>=5.10.0",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/seu-usuario/investi"
+"Bug Tracker" = "https://github.com/seu-usuario/investi/issues"
+
+[project.scripts]
+investi-cenarios = "exemplos.simulacao_cenarios:main"
+investi-aportes = "exemplos.simulacao_aportes:main"
+investi-tesouro = "exemplos.simulacao_tesouro:main"
+investi-dashboard = "streamlit_apps.dashboard:main"
+
+[tool.setuptools]
+packages = ["investi", "investi.investimentos", "investi.carteira", "investi.simulacao", "investi.dados", "exemplos", "streamlit_apps"] 
