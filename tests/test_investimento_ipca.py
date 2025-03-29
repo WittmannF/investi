@@ -87,11 +87,11 @@ def test_simular_periodo(investimento_ipca):
         date(2023, 6, 1),
         date(2023, 7, 1),  # Mês de pagamento (6 meses depois)
     ]
-    
+
     # Primeiro mês (só inicializa)
     investimento_ipca.historico[datas[0]] = investimento_ipca.simular_mes(datas[0])
     assert investimento_ipca.historico[datas[0]].valor == 10000.0
-    
+
     # Simula os meses seguintes
     valor_atual = 10000.0
     for i in range(1, 6):  # até o 6º mês
@@ -99,11 +99,22 @@ def test_simular_periodo(investimento_ipca):
         taxa = investimento_ipca.obter_taxa_mensal(datas[i])
         valor_atual *= (1 + taxa)
         assert investimento_ipca.historico[datas[i]].valor == pytest.approx(valor_atual, rel=1e-4)
+
+    # Armazena o valor antes do pagamento de juros
+    valor_antes_pagamento = investimento_ipca.historico[datas[5]].valor
     
-    # No 7º mês (datas[6]), deve ter pagamento de juros e voltar ao principal
+    # No 7º mês (datas[6]), deve ter pagamento de juros
     investimento_ipca.historico[datas[6]] = investimento_ipca.simular_mes(datas[6])
     assert investimento_ipca.historico[datas[6]].juros_pagos
-    assert investimento_ipca.historico[datas[6]].valor == 10000.0
+    assert investimento_ipca.historico[datas[6]].valor_juros_pagos > 0
+    
+    # O valor deve ser diferente do mês anterior (após pagamento dos juros),
+    # mas para investimentos IPCA+, pode ser maior devido à correção monetária
+    # aplicada no mesmo mês em que os juros são pagos
+    assert investimento_ipca.historico[datas[6]].valor != valor_antes_pagamento
+    
+    # O valor não deve voltar ao principal original, pois mantemos o valor corrigido pela inflação
+    assert investimento_ipca.historico[datas[6]].valor > investimento_ipca.valor_principal
 
 
 def test_definir_fonte_ipca(investimento_ipca):

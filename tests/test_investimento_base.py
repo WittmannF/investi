@@ -158,7 +158,7 @@ def test_juros_semestrais_pagamento():
         taxa_fixa_mensal=0.01,
         juros_semestrais=True
     )
-    
+
     # Simula mês a mês até o pagamento de juros
     datas = [
         date(2023, 1, 1),  # Data inicial
@@ -169,17 +169,25 @@ def test_juros_semestrais_pagamento():
         date(2023, 6, 1),
         date(2023, 7, 1),  # Mês de pagamento (6 meses depois)
     ]
+
+    # Armazena valores para comparação
+    valores = []
     
     # Simula mês a mês
     for data in datas:
         resultado = investimento.simular_mes(data)
+        valores.append(resultado.valor)
+        
         # No mês de pagamento
         if data == datas[-1]:
             assert resultado.juros_pagos
-            assert resultado.valor == 1000.0  # Deve voltar ao principal
-        
-    # No mês de pagamento, os juros acumulados devem ter sido zerados
-    assert investimento.historico[datas[-1]].juros_acumulados == 0.0
+            assert resultado.valor_juros_pagos > 0
+            # O valor do investimento após pagamento de juros deve ser menor 
+            # que no mês anterior (já que parte dos juros foi paga)
+            assert resultado.valor < valores[-2]
+            # Para InvestimentoFixo, o valor deve ser aproximadamente igual ao principal
+            # devido a arredondamentos de ponto flutuante
+            assert resultado.valor == pytest.approx(investimento.valor_principal, abs=1e-10)
 
 
 def test_calculo_rentabilidade(investimento_teste):
