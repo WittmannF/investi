@@ -2,7 +2,7 @@ from datetime import date
 import math
 from typing import Optional
 
-from investi.investimentos.base import Investimento
+from investi.investimentos.base import Investimento, Operador, Indexador
 
 class InvestimentoPrefixado(Investimento):
     """
@@ -42,15 +42,12 @@ class InvestimentoPrefixado(Investimento):
             data_fim=data_fim,
             moeda=moeda,
             taxa=taxa,
-            indexador='Prefixado',
-            operador='+',  # Prefixado também usa operador aditivo para validação
+            indexador=Indexador.PREFIXADO,
+            operador=Operador.ADITIVO,  # Prefixado também usa operador aditivo para validação
             juros_semestrais=juros_semestrais
         )
-        
-        # Taxa anual
-        self.taxa_anual = taxa
     
-    def obter_valor_indexador(self, data: date) -> Optional[float]:
+    def obter_valor_indexador(self, data: date) -> float:
         """
         Investimento prefixado não tem indexador real.
         Retorna 0 pois a taxa já está embutida no cálculo da taxa mensal.
@@ -63,24 +60,10 @@ class InvestimentoPrefixado(Investimento):
         """
         return 0.0
     
-    def obter_taxa_mensal(self, data: date) -> float:
-        """
-        Calcula a taxa mensal equivalente à taxa anual prefixada
-        
-        Args:
-            data: Data para cálculo da taxa (não tem efeito no prefixado)
-            
-        Returns:
-            Taxa mensal em decimal
-        """
-        # Converte a taxa anual para mensal
-        # Usando a fórmula: (1 + taxa_anual)^(1/12) - 1
-        return math.pow(1 + self.taxa_anual, 1/12) - 1
-    
     def __str__(self) -> str:
         return (
             f"{self.nome} - {self.moeda} {self.valor_principal:,.2f}\n"
             f"Período: {self.data_inicio} a {self.data_fim}\n"
-            f"Taxa Prefixada: {self.taxa_anual:.2%} ao ano\n"
+            f"Taxa Prefixada: {self.taxa:.2%} ao ano\n"
             f"{'Juros Semestrais' if self.juros_semestrais else 'Juros no Vencimento'}"
         ) 

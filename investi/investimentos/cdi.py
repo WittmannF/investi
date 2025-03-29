@@ -3,18 +3,23 @@ Módulo com classes para investimentos em CDI e Selic
 """
 
 from datetime import date
-from typing import Dict, Optional
+from typing import Dict, Optional, Union, List, Tuple
+import math
 
-from investi.investimentos.base import Investimento
+from investi.investimentos.base import Investimento, Operador, Indexador
+from investi.dados.cdi import CDIDados
 
 
 class InvestimentoCDI(Investimento):
     """
-    Classe para representar investimentos baseados no CDI
+    Implementação de investimento atrelado ao CDI.
     
-    Esta classe implementa investimentos como CDBs, LCIs, LCAs e
-    outros títulos que utilizam o CDI como indexador.
+    Pode ser representado como percentual do CDI (ex: 110% do CDI)
+    ou como CDI + taxa (ex: CDI + 2%)
     """
+
+    # Dados do CDI (serão carregados apenas uma vez)
+    cdi_dados = CDIDados()
     
     def __init__(
         self,
@@ -23,86 +28,130 @@ class InvestimentoCDI(Investimento):
         data_inicio: date,
         data_fim: date,
         taxa: float,
-        juros_semestrais: bool = False,
-        moeda: str = "R$"
+        operador: Optional[Operador] = None,
+        moeda: str = 'BRL',
+        juros_semestrais: bool = False
     ):
         """
-        Inicializa um investimento em CDI
+        Inicializa um investimento indexado ao CDI
         
         Args:
             nome: Nome do investimento
             valor_principal: Valor inicial investido
-            data_inicio: Data inicial do investimento
+            data_inicio: Data de início do investimento
             data_fim: Data de vencimento do investimento
-            taxa: Percentual do CDI (1.0 = 100% do CDI, 1.1 = 110% do CDI)
-            juros_semestrais: Se o investimento paga juros semestrais
-            moeda: Moeda do investimento
+            taxa: Taxa do investimento 
+                - Se operador='+', taxa é o spread em pontos percentuais (ex: 0.02 para CDI + 2%)
+                - Se operador='x', taxa é o percentual do CDI (ex: 1.10 para 110% do CDI)
+            operador: Tipo de operação ('+' para CDI + taxa, 'x' para % do CDI)
+            moeda: Moeda do investimento (default: 'BRL')
+            juros_semestrais: Se True, paga juros semestralmente
         """
-        # CDI sempre usa operador multiplicativo
+        # Se não informar o operador, assume percentual do CDI (110% do CDI)
+        if operador is None:
+            operador = Operador.MULTIPLICADO
+        
         super().__init__(
             nome=nome,
             valor_principal=valor_principal,
             data_inicio=data_inicio,
             data_fim=data_fim,
-            taxa=taxa,
-            operador="x",
-            indexador="CDI",
             moeda=moeda,
+            taxa=taxa,
+            operador=operador,
+            indexador=Indexador.CDI,
             juros_semestrais=juros_semestrais
         )
-        
-        # Fonte de dados para CDI
-        self.fonte_cdi: Dict[date, float] = {}
     
     def obter_valor_indexador(self, data: date) -> float:
         """
-        Obtém o valor do CDI para uma data específica
+        Obtém o valor do CDI para o mês correspondente à data
         
         Args:
             data: Data para a qual se deseja o valor do CDI
             
         Returns:
-            Valor do CDI em formato decimal
+            Valor do CDI mensal em formato decimal
         """
-        # Tenta obter da fonte de dados configurada
-        if data in self.fonte_cdi:
-            return self.fonte_cdi[data]
-        
-        # Se não encontrou na fonte, usa valores padrão
-        # (Na prática, deveria obter de fonte de dados oficial ou histórica)
-        
-        # Valores fictícios para diferentes épocas
-        if data.year <= 2020:
-            return 0.002  # 0.2% ao mês (cerca de 2.4% ao ano)
-        elif data.year <= 2021:
-            return 0.003  # 0.3% ao mês (cerca de 3.6% ao ano)
-        elif data.year <= 2022:
-            return 0.008  # 0.8% ao mês (cerca de 10% ao ano)
-        else:
-            return 0.01  # 1.0% ao mês (cerca de 12.7% ao ano)
+        return self.cdi_dados.obter_cdi_mensal(data)
     
-    def obter_taxa_mensal(self, data: date) -> float:
+    @classmethod
+    def cdb(
+        cls,
+        nome: str,
+        valor_principal: float,
+        data_inicio: date,
+        data_fim: date,
+        taxa: float,
+        moeda: str = 'BRL',
+        juros_semestrais: bool = False
+    ) -> 'InvestimentoCDI':
         """
-        Calcula a taxa mensal para uma data específica
+        Cria um CDB com percentual do CDI
         
         Args:
-            data: Data para a qual se deseja a taxa
+            nome: Nome do investimento
+            valor_principal: Valor inicial investido
+            data_inicio: Data de início do investimento
+            data_fim: Data de vencimento do investimento
+            taxa: Percentual do CDI (1.10 = 110% do CDI)
+            moeda: Moeda do investimento
+            juros_semestrais: Se o investimento paga juros semestrais
             
         Returns:
-            Taxa mensal em formato decimal
+            Objeto InvestimentoCDI configurado como CDB
         """
-        # Para CDI, a taxa é o valor do indexador multiplicado pela taxa contratada
-        valor_cdi = self.obter_valor_indexador(data)
-        return valor_cdi * self.taxa
+        return cls(
+            nome=nome,
+            valor_principal=valor_principal,
+            data_inicio=data_inicio,
+            data_fim=data_fim,
+            taxa=taxa,
+            operador=Operador.MULTIPLICADO,
+            moeda=moeda,
+            juros_semestrais=juros_semestrais
+        )
     
-    def definir_fonte_cdi(self, fonte_cdi: Dict[date, float]) -> None:
+    @classmethod
+    def lci_lca(
+        cls,
+        nome: str,
+        valor_principal: float,
+        data_inicio: date,
+        data_fim: date,
+        taxa: float,
+        moeda: str = 'BRL',
+        juros_semestrais: bool = False
+    ) -> 'InvestimentoCDI':
         """
-        Define uma fonte de dados para CDI
+        Cria uma LCI/LCA com percentual do CDI
         
         Args:
-            fonte_cdi: Dicionário com datas e valores do CDI
+            nome: Nome do investimento
+            valor_principal: Valor inicial investido
+            data_inicio: Data de início do investimento
+            data_fim: Data de vencimento do investimento
+            taxa: Percentual do CDI (0.98 = 98% do CDI)
+            moeda: Moeda do investimento
+            juros_semestrais: Se o investimento paga juros semestrais
+            
+        Returns:
+            Objeto InvestimentoCDI configurado como LCI/LCA
         """
-        self.fonte_cdi = fonte_cdi
+        # Configuramos como LCI/LCA (similar ao CDB, mas tipicamente com taxa menor)
+        obj = cls(
+            nome=nome,
+            valor_principal=valor_principal,
+            data_inicio=data_inicio,
+            data_fim=data_fim,
+            taxa=taxa,
+            operador=Operador.MULTIPLICADO,
+            moeda=moeda,
+            juros_semestrais=juros_semestrais
+        )
+        # Marca como LCI/LCA para fins de identificação
+        obj.indexador = Indexador.CDI
+        return obj
 
 
 class InvestimentoSelic(InvestimentoCDI):
@@ -147,7 +196,7 @@ class InvestimentoSelic(InvestimentoCDI):
         )
         
         # Altera o indexador para Selic
-        self.indexador = "Selic"
+        self.indexador = Indexador.SELIC
     
     def __str__(self) -> str:
         """

@@ -1,6 +1,11 @@
 """
-Módulo de dados da biblioteca Investi
+Pacote para dados e fontes de informação utilizados pelos investimentos
 """
+
+from investi.dados.ipca import IPCADados
+from investi.dados.cdi import CDIDados
+
+__all__ = ['IPCADados', 'CDIDados']
 
 import os
 import json
