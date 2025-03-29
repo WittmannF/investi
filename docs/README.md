@@ -29,7 +29,7 @@ Para instalar o pacote `investi` diretamente do repositório:
 
 ```bash
 # Clone o repositório
-git clone https://github.com/seu-usuario/investi.git
+git clone https://github.com/WittmannF/investi.git
 cd investi
 
 # Instale o pacote em modo de desenvolvimento

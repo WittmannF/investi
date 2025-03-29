@@ -9,7 +9,7 @@ description = "Biblioteca para simulação de investimentos financeiros"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
-    {name = "Seu Nome", email = "seu.email@exemplo.com"}
+    {name = "Fernando Wittmann", email = "fernando.wittmann@gmail.com"}
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -30,8 +30,8 @@ dependencies = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/seu-usuario/investi"
-"Bug Tracker" = "https://github.com/seu-usuario/investi/issues"
+"Homepage" = "https://github.com/WittmannF/investi"
+"Bug Tracker" = "https://github.com/WittmannF/investi/issues"
 
 [project.scripts]
 investi-cenarios = "exemplos.simulacao_cenarios:main"

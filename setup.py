@@ -6,12 +6,12 @@ with open("README.md", "r", encoding="utf-8") as fh:
 setup(
     name="investi",
     version="0.1.0",
-    author="Seu Nome",
-    author_email="seu.email@exemplo.com",
-    description="Biblioteca para simulação de investimentos financeiros",
+    author="Fernando Wittmann",
+    author_email="fernando.wittmann@gmail.com",
+    description="Biblioteca para simulação de investimentos em renda fixa",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/seu-usuario/investi",
+    url="https://github.com/WittmannF/investi",
     packages=find_packages(include=["investi", "investi.*", "exemplos", "exemplos.*"]),
     classifiers=[
         "Programming Language :: Python :: 3",
