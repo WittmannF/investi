@@ -18,11 +18,8 @@ O `investi` é uma ferramenta para simulação de carteiras de investimentos, pe
 ## Instalação
 
 ```bash
-# Via pip (quando disponível)
-pip install investi
-
 # Diretamente do repositório
-git clone https://github.com/seu-usuario/investi.git
+git clone https://github.com/Wittmannf/investi.git
 cd investi
 pip install -e .
 ```
