@@ -100,6 +100,18 @@ O pacote inclui uma aplicação Streamlit para uso interativo:
 streamlit run streamlit_app/Home.py
 ```
 
+Alguns exemplos de telas:
+
+<img width="1083" alt="image" src="https://github.com/user-attachments/assets/d9f5ca78-5d56-4520-9c28-a89a66fa77fb" />
+
+
+<img width="1087" alt="image" src="https://github.com/user-attachments/assets/5229faec-0e96-4fe4-9c14-adf81b4cb76c" />
+
+
+<img width="1057" alt="image" src="https://github.com/user-attachments/assets/d0b784b8-d319-4502-b7ca-291647a1185a" />
+
+
+
 ## Recursos
 
 - **Investimentos suportados**: Tesouro Direto (Selic, IPCA+, Prefixado), CDBs, LCIs/LCAs
