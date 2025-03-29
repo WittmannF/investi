@@ -85,26 +85,27 @@ def test_validacao_taxa_operador():
     data_inicio = date(2023, 1, 1)
     data_fim = date(2023, 12, 31)
     
-    # Taxa sem operador
+    # Taxa sem operador quando indexador é fornecido
     with pytest.raises(ValueError):
-        InvestimentoFixo(
+        Investimento(
             nome=nome,
             valor_principal=valor_principal,
             data_inicio=data_inicio,
             data_fim=data_fim,
             taxa=0.05,  # Taxa sem operador
-            operador=None
+            indexador="TESTE",  # Indexador fornecido
+            operador=None  # Sem operador
         )
     
     # Operador sem taxa
     with pytest.raises(ValueError):
-        InvestimentoFixo(
+        Investimento(
             nome=nome,
             valor_principal=valor_principal,
             data_inicio=data_inicio,
             data_fim=data_fim,
-            taxa=0.0,
-            operador="+"  # Operador sem taxa
+            taxa=0.0,  # Sem taxa
+            operador=Operador.ADITIVO  # Operador fornecido
         )
 
 
@@ -169,38 +170,43 @@ def test_juros_semestrais_pagamento():
         date(2023, 7, 1),  # Mês de pagamento (6 meses depois)
     ]
     
-    # Primeiro mês
-    investimento.historico[datas[0]] = investimento.simular_mes(datas[0])
-    
-    # Simula meses intermediários
-    for i in range(1, 6):
-        investimento.historico[datas[i]] = investimento.simular_mes(datas[i])
-    
-    # Mês de pagamento
-    resultado_pagamento = investimento.simular_mes(datas[6])
-    
-    # Deve ter pagado juros e voltado ao principal
-    assert resultado_pagamento.juros_pagos
-    assert resultado_pagamento.valor == 1000.0
+    # Simula mês a mês
+    for data in datas:
+        resultado = investimento.simular_mes(data)
+        # No mês de pagamento
+        if data == datas[-1]:
+            assert resultado.juros_pagos
+            assert resultado.valor == 1000.0  # Deve voltar ao principal
+        
+    # No mês de pagamento, os juros acumulados devem ter sido zerados
+    assert investimento.historico[datas[-1]].juros_acumulados == 0.0
 
 
 def test_calculo_rentabilidade(investimento_teste):
     """Testa o cálculo de rentabilidade entre períodos"""
     # Adiciona alguns valores ao histórico
     investimento_teste.historico[date(2023, 1, 1)] = ResultadoMensal(
+        data=date(2023, 1, 1),
         valor=1000.0,
+        valor_principal=1000.0,
+        juros=0.0,
+        juros_acumulados=0.0,
         taxa_mensal=0
     )
     
     data_final = date(2023, 3, 1)
     valor_final = 1000.0 * (1 + 0.01) * (1 + 0.01)
     investimento_teste.historico[data_final] = ResultadoMensal(
+        data=data_final,
         valor=valor_final,
+        valor_principal=1000.0,
+        juros=valor_final - 1000.0 * (1 + 0.01),
+        juros_acumulados=valor_final - 1000.0,
         taxa_mensal=0.01
     )
     
     # Calcula rentabilidade
-    rentabilidade = investimento_teste.calcular_rentabilidade_periodo(
+    rentabilidade = investimento_teste.calcular_rentabilidade(
         date(2023, 1, 1), data_final
     )
     

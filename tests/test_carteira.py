@@ -7,7 +7,7 @@ from datetime import date
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from investi.carteira import Carteira
-from investi.investimentos.base import Investimento, ResultadoMensal
+from investi.investimentos.base import Investimento, ResultadoMensal, Operador
 from investi.investimentos.ipca import InvestimentoIPCA
 from investi.investimentos.cdi import InvestimentoCDI
 from investi.investimentos.prefixado import InvestimentoPrefixado
@@ -24,11 +24,13 @@ class InvestimentoSimples(Investimento):
             data_fim=data_fim,
             indexador="TESTE",
             taxa=0.12,  # 12% ao ano
-            operador="+",
+            operador=Operador.ADITIVO,
         )
         self.taxa_fixa_mensal = taxa_fixa_mensal
     
     def obter_taxa_mensal(self, data):
+        if data == self.data_inicio:
+            return 0.0  # No primeiro mês, não há juros
         return self.taxa_fixa_mensal
     
     def obter_valor_indexador(self, data):

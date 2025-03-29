@@ -239,15 +239,61 @@ class MotorSimulacao:
         Cria uma cópia da carteira atual para simulações independentes
         
         Returns:
-            Nova instância de Carteira com os mesmos investimentos
+            Nova instância de Carteira com cópias dos investimentos originais
         """
         # Cria uma nova carteira
         nova_carteira = Carteira(nome=f"{self.carteira.nome} (cópia)")
         
-        # Adiciona os mesmos investimentos
+        # Adiciona cópias dos investimentos
         for nome, investimento in self.carteira.investimentos.items():
-            # Aqui precisaríamos de uma forma de clonar os investimentos
-            # Por hora, apenas os adiciona diretamente (referência)
-            nova_carteira.adicionar_investimento(investimento)
+            # Cria uma nova instância baseada no tipo do investimento original
+            if investimento.__class__.__name__ == "InvestimentoIPCA":
+                from investi.investimentos import InvestimentoIPCA
+                novo_investimento = InvestimentoIPCA(
+                    nome=investimento.nome,
+                    valor_principal=investimento.valor_principal,
+                    data_inicio=investimento.data_inicio,
+                    data_fim=investimento.data_fim,
+                    taxa=investimento.taxa,
+                    moeda=investimento.moeda,
+                    juros_semestrais=investimento.juros_semestrais
+                )
+            elif investimento.__class__.__name__ == "InvestimentoCDI":
+                from investi.investimentos import InvestimentoCDI
+                novo_investimento = InvestimentoCDI(
+                    nome=investimento.nome,
+                    valor_principal=investimento.valor_principal,
+                    data_inicio=investimento.data_inicio,
+                    data_fim=investimento.data_fim,
+                    taxa=investimento.taxa,
+                    moeda=investimento.moeda
+                )
+            elif investimento.__class__.__name__ == "InvestimentoPrefixado":
+                from investi.investimentos import InvestimentoPrefixado
+                novo_investimento = InvestimentoPrefixado(
+                    nome=investimento.nome,
+                    valor_principal=investimento.valor_principal,
+                    data_inicio=investimento.data_inicio,
+                    data_fim=investimento.data_fim,
+                    taxa=investimento.taxa,
+                    moeda=investimento.moeda,
+                    juros_semestrais=investimento.juros_semestrais
+                )
+            elif investimento.__class__.__name__ == "InvestimentoSelic":
+                from investi.investimentos import InvestimentoSelic
+                novo_investimento = InvestimentoSelic(
+                    nome=investimento.nome,
+                    valor_principal=investimento.valor_principal,
+                    data_inicio=investimento.data_inicio,
+                    data_fim=investimento.data_fim,
+                    taxa=investimento.taxa,
+                    moeda=investimento.moeda
+                )
+            else:
+                # Fallback para tipos desconhecidos (não ideal, mas funcional)
+                # Na prática, seria melhor ter um método clone() em cada classe
+                novo_investimento = investimento  # Usa referência como último recurso
+            
+            nova_carteira.adicionar_investimento(novo_investimento)
         
         return nova_carteira 

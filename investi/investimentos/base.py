@@ -11,7 +11,7 @@ from dataclasses import dataclass
 class Operador(str, Enum):
     """Enum para operadores utilizados no cálculo de rentabilidade"""
     
-    SOMADO = "+"  # Para casos onde o indexador é somado à taxa (ex: IPCA + 5%)
+    ADITIVO = "+"  # Para casos onde o indexador é somado à taxa (ex: IPCA + 5%)
     MULTIPLICADO = "x"  # Para casos onde o indexador é multiplicado pela taxa (ex: 110% do CDI)
 
 
@@ -26,6 +26,7 @@ class ResultadoMensal:
     juros_acumulados: float
     indexador: Optional[float] = None
     taxa_mensal: Optional[float] = None
+    juros_pagos: bool = False
 
 
 class Investimento:
@@ -65,13 +66,18 @@ class Investimento:
         Raises:
             ValueError: Se a data de início for maior ou igual à data de vencimento
             ValueError: Se a taxa for fornecida sem um operador
+            ValueError: Se um operador for fornecido sem uma taxa
         """
         # Validações básicas
         if data_inicio >= data_fim:
             raise ValueError("Data de início deve ser anterior à data de vencimento")
         
-        if taxa and not operador and indexador:
-            raise ValueError("Operador deve ser definido quando há taxa")
+        # Validação de taxa e operador
+        if taxa > 0 and not operador and indexador:
+            raise ValueError("Operador deve ser definido quando há taxa e indexador")
+        
+        if operador and taxa == 0:
+            raise ValueError("Taxa deve ser definida quando há operador")
         
         # Atributos básicos
         self.nome = nome
@@ -119,7 +125,7 @@ class Investimento:
         """
         raise NotImplementedError("Classes derivadas devem implementar este método")
     
-    def simular_mes(self, data: date) -> float:
+    def simular_mes(self, data: date) -> ResultadoMensal:
         """
         Simula o investimento para um mês específico
         
@@ -127,7 +133,7 @@ class Investimento:
             data: Data (primeiro dia do mês) para a qual se deseja simular
             
         Returns:
-            Valor do investimento ao final do mês
+            Objeto ResultadoMensal com o resultado da simulação para o mês
             
         Raises:
             ValueError: Se a data for anterior à data de início
@@ -136,36 +142,57 @@ class Investimento:
         if data < self.data_inicio:
             raise ValueError(f"Data {data} é anterior à data de início {self.data_inicio}")
         
-        # Se for o primeiro mês, o valor inicial é o valor principal
-        if not self.historico:
+        # Se for o primeiro mês (data igual à data de início), o valor é o valor principal sem juros
+        if data == self.data_inicio:
             valor_atual = self.valor_principal
+            juros_mes = 0.0
             juros_acumulados = 0.0
+            taxa_mensal = 0.0
         else:
-            # Caso contrário, pega o último valor do histórico
-            ultima_data = max(self.historico.keys())
-            ultimo_resultado = self.historico[ultima_data]
-            valor_atual = ultimo_resultado.valor
-            juros_acumulados = ultimo_resultado.juros_acumulados
+            # Caso contrário, aplica os juros
+            if not self.historico:
+                # Se não tiver histórico, cria um para a data inicial
+                resultado_inicial = ResultadoMensal(
+                    data=self.data_inicio,
+                    valor=self.valor_principal,
+                    valor_principal=self.valor_principal,
+                    juros=0.0,
+                    juros_acumulados=0.0,
+                    indexador=None,
+                    taxa_mensal=0.0,
+                    juros_pagos=False
+                )
+                self.historico[self.data_inicio] = resultado_inicial
+                valor_atual = self.valor_principal
+                juros_acumulados = 0.0
+            else:
+                # Pega o último valor do histórico
+                ultima_data = max(self.historico.keys())
+                ultimo_resultado = self.historico[ultima_data]
+                valor_atual = ultimo_resultado.valor
+                juros_acumulados = ultimo_resultado.juros_acumulados
+            
+            # Calcula a taxa mensal (pode depender do indexador)
+            taxa_mensal = self.obter_taxa_mensal(data)
+            
+            # Calcula o valor dos juros do mês
+            juros_mes = valor_atual * taxa_mensal
+            
+            # Acumula os juros
+            juros_acumulados += juros_mes
+            
+            # Juros são reinvestidos (entram no valor atual)
+            valor_atual += juros_mes
         
-        # Calcula a taxa mensal (pode depender do indexador)
-        taxa_mensal = self.obter_taxa_mensal(data)
-        
-        # Calcula o valor dos juros do mês
-        juros_mes = valor_atual * taxa_mensal
-        
-        # Acumula os juros
-        juros_acumulados += juros_mes
+        # Flag para juros pagos neste mês
+        juros_pagos = False
         
         # Verifica se é necessário pagar juros semestrais
-        if self.juros_semestrais and self._eh_mes_pagamento_juros(data):
-            # Paga os juros acumulados (não entram no valor atual)
-            valor_juros_pagos = juros_acumulados
+        if self.juros_semestrais and self._eh_mes_pagamento_juros(data) and data != self.data_inicio:
+            # Paga os juros acumulados (não modifica o valor atual, apenas zera os juros acumulados)
+            juros_pagos = True
             juros_acumulados = 0.0
             self.ultimo_pagamento_juros = data
-        else:
-            # Juros são reinvestidos (entram no valor atual)
-            valor_juros_pagos = 0.0
-            valor_atual += juros_mes
         
         # Cria o resultado mensal
         resultado = ResultadoMensal(
@@ -175,15 +202,16 @@ class Investimento:
             juros=juros_mes,
             juros_acumulados=juros_acumulados,
             indexador=self.obter_valor_indexador(data),
-            taxa_mensal=taxa_mensal
+            taxa_mensal=taxa_mensal,
+            juros_pagos=juros_pagos
         )
         
         # Armazena o resultado no histórico
         self.historico[data] = resultado
         
-        return valor_atual
+        return resultado
     
-    def simular_periodo(self, data_inicio: date, data_fim: date) -> Dict[date, float]:
+    def simular_periodo(self, data_inicio: date, data_fim: date) -> Dict[date, ResultadoMensal]:
         """
         Simula o investimento para um período específico
         
@@ -192,7 +220,7 @@ class Investimento:
             data_fim: Data final do período (deve ser <= data_fim do investimento)
             
         Returns:
-            Dicionário com os valores simulados mês a mês
+            Dicionário com os resultados mensais
         """
         # Validações
         if data_inicio < self.data_inicio:
@@ -201,19 +229,15 @@ class Investimento:
         if data_fim > self.data_fim:
             raise ValueError(f"Data de fim {data_fim} é posterior à data de fim do investimento {self.data_fim}")
         
-        # Limpa o histórico para garantir consistência
-        self.historico = {}
-        self.juros_acumulados = 0.0
-        self.ultimo_pagamento_juros = None
-        
         # Gera a lista de meses
         meses = self._gerar_meses(data_inicio, data_fim)
         
         # Simula cada mês
-        resultados = {}
         for mes in meses:
-            valor = self.simular_mes(mes)
-            resultados[mes] = valor
+            self.simular_mes(mes)
+        
+        # Filtra e retorna apenas os resultados do período solicitado
+        resultados = {data: resultado for data, resultado in self.historico.items() if data_inicio <= data <= data_fim}
         
         return resultados
     
@@ -222,40 +246,35 @@ class Investimento:
         Calcula a rentabilidade do investimento entre duas datas
         
         Args:
-            data_inicio: Data inicial (se None, usa a data_inicio do investimento)
-            data_fim: Data final (se None, usa a última data do histórico)
+            data_inicio: Data inicial (se omitida, usa a data de início do investimento)
+            data_fim: Data final (se omitida, usa a última data simulada)
             
         Returns:
-            Rentabilidade no período em formato decimal
+            Rentabilidade no período (formato decimal)
             
         Raises:
-            ValueError: Se não houver histórico ou se as datas forem inválidas
+            ValueError: Se o investimento não foi simulado ainda ou as datas estão fora do período simulado
         """
+        # Verifica se o investimento foi simulado
         if not self.historico:
-            raise ValueError("Não há histórico para calcular a rentabilidade")
+            raise ValueError("O investimento ainda não foi simulado")
         
-        # Define a data inicial
+        # Determina as datas de início e fim
         if data_inicio is None:
-            data_inicio = self.data_inicio
+            data_inicio = min(self.historico.keys())
         
-        # Define a data final
         if data_fim is None:
             data_fim = max(self.historico.keys())
         
-        # Verifica se as datas estão no histórico
-        if data_inicio not in self.historico and data_inicio != self.data_inicio:
-            raise ValueError(f"Data {data_inicio} não está no histórico")
+        # Verifica se as datas estão disponíveis no histórico
+        if data_inicio not in self.historico:
+            raise ValueError(f"Data inicial {data_inicio} não está disponível no histórico")
         
         if data_fim not in self.historico:
-            raise ValueError(f"Data {data_fim} não está no histórico")
+            raise ValueError(f"Data final {data_fim} não está disponível no histórico")
         
-        # Valor inicial (é o valor principal se for a data de início)
-        if data_inicio == self.data_inicio:
-            valor_inicial = self.valor_principal
-        else:
-            valor_inicial = self.historico[data_inicio].valor
-        
-        # Valor final
+        # Obtém os valores inicial e final
+        valor_inicial = self.historico[data_inicio].valor
         valor_final = self.historico[data_fim].valor
         
         # Calcula a rentabilidade
@@ -274,6 +293,10 @@ class Investimento:
         # Se não houver pagamento semestral, retorna False
         if not self.juros_semestrais:
             return False
+        
+        # Se for a data de vencimento, também é um mês de pagamento
+        if data.year == self.data_fim.year and data.month == self.data_fim.month:
+            return True
         
         # Se é o primeiro pagamento
         if self.ultimo_pagamento_juros is None:

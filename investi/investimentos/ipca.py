@@ -42,7 +42,7 @@ class InvestimentoIPCA(Investimento):
             moeda=moeda,
             indexador='IPCA',
             taxa=taxa,
-            operador='+',  # IPCA sempre usa operador aditivo
+            operador=Operador.ADITIVO,  # IPCA sempre usa operador aditivo
             juros_semestrais=juros_semestrais
         )
         

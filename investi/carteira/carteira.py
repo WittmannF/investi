@@ -34,7 +34,7 @@ class Carteira:
         """
         self.nome = nome
         self.investimentos: Dict[str, Investimento] = {}
-        self.ultimo_resultado: Optional[ResultadoCarteira] = None
+        self.resultado: Optional[ResultadoCarteira] = None
     
     def adicionar_investimento(self, investimento: Investimento) -> None:
         """
@@ -91,7 +91,8 @@ class Carteira:
             
             # Simula cada investimento para o mês atual
             for nome, investimento in self.investimentos.items():
-                valor = investimento.simular_mes(mes)
+                resultado = investimento.simular_mes(mes)
+                valor = resultado.valor
                 resultado_mes[nome] = valor
                 total_mes += valor
             
@@ -103,7 +104,7 @@ class Carteira:
             resultado_consolidado[mes] = total_mes
         
         # Armazena o último resultado
-        self.ultimo_resultado = ResultadoCarteira(
+        self.resultado = ResultadoCarteira(
             data_inicio=data_inicio,
             data_fim=data_fim,
             investimentos=self.investimentos.copy(),
@@ -111,7 +112,7 @@ class Carteira:
             resultado_consolidado=resultado_consolidado
         )
         
-        return self.ultimo_resultado
+        return self.resultado
     
     def valor_total(self, data: Optional[date] = None) -> float:
         """
@@ -126,18 +127,18 @@ class Carteira:
         Raises:
             ValueError: Se a carteira ainda não foi simulada ou se a data está fora do período simulado
         """
-        if self.ultimo_resultado is None:
+        if self.resultado is None:
             raise ValueError("A carteira ainda não foi simulada")
         
         if data is None:
             # Se a data não foi especificada, usa a última data simulada
-            data = max(self.ultimo_resultado.resultado_consolidado.keys())
+            data = max(self.resultado.resultado_consolidado.keys())
         
         # Verifica se a data está dentro do período simulado
-        if data not in self.ultimo_resultado.resultado_consolidado:
+        if data not in self.resultado.resultado_consolidado:
             raise ValueError(f"A data {data} está fora do período simulado")
         
-        return self.ultimo_resultado.resultado_consolidado[data]
+        return self.resultado.resultado_consolidado[data]
     
     def rentabilidade_periodo(self, data_inicio: date, data_fim: date) -> float:
         """
@@ -153,19 +154,19 @@ class Carteira:
         Raises:
             ValueError: Se a carteira ainda não foi simulada ou se as datas estão fora do período simulado
         """
-        if self.ultimo_resultado is None:
+        if self.resultado is None:
             raise ValueError("A carteira ainda não foi simulada")
         
         # Verifica se as datas estão dentro do período simulado
-        if data_inicio not in self.ultimo_resultado.resultado_consolidado:
+        if data_inicio not in self.resultado.resultado_consolidado:
             raise ValueError(f"A data {data_inicio} está fora do período simulado")
         
-        if data_fim not in self.ultimo_resultado.resultado_consolidado:
+        if data_fim not in self.resultado.resultado_consolidado:
             raise ValueError(f"A data {data_fim} está fora do período simulado")
         
         # Calcula a rentabilidade
-        valor_inicial = self.ultimo_resultado.resultado_consolidado[data_inicio]
-        valor_final = self.ultimo_resultado.resultado_consolidado[data_fim]
+        valor_inicial = self.resultado.resultado_consolidado[data_inicio]
+        valor_final = self.resultado.resultado_consolidado[data_fim]
         
         return (valor_final / valor_inicial) - 1
     
@@ -179,11 +180,11 @@ class Carteira:
         Raises:
             ValueError: Se a carteira ainda não foi simulada
         """
-        if self.ultimo_resultado is None:
+        if self.resultado is None:
             raise ValueError("A carteira ainda não foi simulada")
         
         # Converte o dicionário de resultados mensais em DataFrame
-        df = pd.DataFrame(self.ultimo_resultado.resultado_mensal).T
+        df = pd.DataFrame(self.resultado.resultado_mensal).T
         
         return df
     
