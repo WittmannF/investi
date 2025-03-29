@@ -121,7 +121,6 @@ Este exemplo mostra como:
 Os seguintes tutoriais estão disponíveis para aprender a usar o pacote:
 
 - [Tutorial Básico (Markdown)](tutorial_jupyter.md) - Guia passo a passo para começar com o pacote
-- [Tutorial Jupyter](jupyter_examples/Exemplo_Basico.ipynb) - Exemplo interativo em Jupyter Notebook
 
 ## Exemplos
 
