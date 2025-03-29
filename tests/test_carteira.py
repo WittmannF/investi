@@ -2,6 +2,7 @@ import sys
 import os
 import pytest
 from datetime import date
+import pandas as pd
 
 # Adicionando o diretório raiz ao path para importar os módulos
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -266,4 +267,70 @@ def test_geracao_meses():
         date(2022, 12, 1),
         date(2023, 1, 1),
         date(2023, 2, 1)
-    ] 
+    ]
+
+
+def test_dividendos_multiplos_investimentos():
+    """Testa se os dividendos de múltiplos investimentos são registrados corretamente"""
+    # Configuração inicial
+    data_inicio = date(2023, 1, 1)
+    data_fim = date(2024, 1, 1)  # 1 ano de simulação para ter pelo menos 2 pagamentos semestrais
+    
+    # Cria dois investimentos IPCA+ com juros semestrais
+    ipca1 = InvestimentoIPCA(
+        nome="Tesouro IPCA+ A",
+        valor_principal=10000.0,
+        data_inicio=data_inicio,
+        data_fim=data_fim,
+        taxa=0.055,  # 5.5% a.a. + IPCA
+        juros_semestrais=True
+    )
+    
+    ipca2 = InvestimentoIPCA(
+        nome="Tesouro IPCA+ B",
+        valor_principal=10000.0,
+        data_inicio=data_inicio,
+        data_fim=data_fim,
+        taxa=0.08,  # 8.0% a.a. + IPCA
+        juros_semestrais=True
+    )
+    
+    # Cria a carteira e adiciona os investimentos
+    carteira = Carteira(nome="Carteira Teste Dividendos")
+    carteira.adicionar_investimento(ipca1)
+    carteira.adicionar_investimento(ipca2)
+    
+    # Simula o período
+    resultado = carteira.simular(data_inicio, data_fim)
+    
+    # Obtém o DataFrame de dividendos
+    df_dividendos = carteira.dividendos_to_dataframe()
+    
+    # Verifica se o DataFrame não está vazio
+    assert not df_dividendos.empty
+    
+    # Datas esperadas de pagamento (juros semestrais)
+    datas_esperadas = [date(2023, 7, 1), date(2024, 1, 1)]
+    
+    # Verifica se as datas esperadas estão no índice do DataFrame
+    for data in datas_esperadas:
+        assert data in df_dividendos.index
+    
+    # Verifica se ambos os investimentos têm valores de dividendos para cada data
+    for data in datas_esperadas:
+        assert not pd.isna(df_dividendos.loc[data, "Tesouro IPCA+ A"])
+        assert not pd.isna(df_dividendos.loc[data, "Tesouro IPCA+ B"])
+        
+    # Verifica se os valores são positivos
+    for data in datas_esperadas:
+        assert df_dividendos.loc[data, "Tesouro IPCA+ A"] > 0
+        assert df_dividendos.loc[data, "Tesouro IPCA+ B"] > 0
+        
+    # Verifica se o investimento com taxa maior paga mais dividendos
+    for data in datas_esperadas:
+        assert df_dividendos.loc[data, "Tesouro IPCA+ B"] > df_dividendos.loc[data, "Tesouro IPCA+ A"]
+        
+    # Verifica se a coluna Total é igual à soma dos dividendos individuais
+    for data in datas_esperadas:
+        soma_dividendos = df_dividendos.loc[data, "Tesouro IPCA+ A"] + df_dividendos.loc[data, "Tesouro IPCA+ B"]
+        assert df_dividendos.loc[data, "Total"] == pytest.approx(soma_dividendos) 

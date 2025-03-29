@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Dict, List, Optional, Tuple, Any
 import pandas as pd
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from investi.investimentos.base import Investimento
 
@@ -15,6 +15,8 @@ class ResultadoCarteira:
     investimentos: Dict[str, Investimento]
     resultado_mensal: Dict[date, Dict[str, float]]
     resultado_consolidado: Dict[date, float]
+    dividendos_recebidos: Dict[date, Dict[str, float]] = field(default_factory=dict)
+    total_dividendos: float = 0.0
 
 
 class Carteira:
@@ -83,18 +85,36 @@ class Carteira:
         # Inicializa dicionários para armazenar os resultados
         resultado_mensal = {}
         resultado_consolidado = {}
+        dividendos_recebidos = {}
+        total_dividendos = 0.0
         
         # Para cada mês, simula cada investimento
         for mes in meses:
             resultado_mes = {}
+            dividendos_mes = {}
             total_mes = 0.0
+            total_dividendos_mes = 0.0
             
             # Simula cada investimento para o mês atual
             for nome, investimento in self.investimentos.items():
-                resultado = investimento.simular_mes(mes)
-                valor = resultado.valor
-                resultado_mes[nome] = valor
-                total_mes += valor
+                # Verifica se o investimento já está ativo neste mês
+                if mes >= investimento.data_inicio:
+                    try:
+                        resultado = investimento.simular_mes(mes)
+                        valor = resultado.valor
+                        resultado_mes[nome] = valor
+                        total_mes += valor
+                        
+                        # Verifica se houve pagamento de dividendos/juros neste mês
+                        if resultado.juros_pagos and resultado.valor_juros_pagos > 0:
+                            dividendos_mes[nome] = resultado.valor_juros_pagos
+                            total_dividendos_mes += resultado.valor_juros_pagos
+                    except ValueError as e:
+                        # Se ocorrer erro na simulação do mês para este investimento, registra como nulo
+                        resultado_mes[nome] = float('nan')
+                else:
+                    # Investimento ainda não iniciado neste mês
+                    resultado_mes[nome] = float('nan')
             
             # Adiciona o total do mês
             resultado_mes["Total"] = total_mes
@@ -102,6 +122,12 @@ class Carteira:
             # Armazena os resultados do mês
             resultado_mensal[mes] = resultado_mes
             resultado_consolidado[mes] = total_mes
+            
+            # Armazena os dividendos recebidos no mês, se houver
+            if dividendos_mes:  # Verifica se há algum dividendo, não apenas o total
+                dividendos_mes["Total"] = total_dividendos_mes
+                dividendos_recebidos[mes] = dividendos_mes.copy()  # Usamos .copy() para evitar problemas
+                total_dividendos += total_dividendos_mes
         
         # Armazena o último resultado
         self.resultado = ResultadoCarteira(
@@ -109,7 +135,9 @@ class Carteira:
             data_fim=data_fim,
             investimentos=self.investimentos.copy(),
             resultado_mensal=resultado_mensal,
-            resultado_consolidado=resultado_consolidado
+            resultado_consolidado=resultado_consolidado,
+            dividendos_recebidos=dividendos_recebidos,
+            total_dividendos=total_dividendos
         )
         
         return self.resultado
@@ -185,6 +213,27 @@ class Carteira:
         
         # Converte o dicionário de resultados mensais em DataFrame
         df = pd.DataFrame(self.resultado.resultado_mensal).T
+        
+        return df
+    
+    def dividendos_to_dataframe(self) -> pd.DataFrame:
+        """
+        Converte os dividendos recebidos em um DataFrame do pandas
+        
+        Returns:
+            DataFrame com os dividendos mensais
+            
+        Raises:
+            ValueError: Se a carteira ainda não foi simulada
+        """
+        if self.resultado is None:
+            raise ValueError("A carteira ainda não foi simulada")
+        
+        if not self.resultado.dividendos_recebidos:
+            return pd.DataFrame()  # Retorna DataFrame vazio se não houver dividendos
+        
+        # Converte o dicionário de dividendos em DataFrame
+        df = pd.DataFrame(self.resultado.dividendos_recebidos).T
         
         return df
     

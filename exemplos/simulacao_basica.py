@@ -120,6 +120,29 @@ def main():
     plt.savefig("evolucao_carteira.png")
     print("Gráfico salvo como 'evolucao_carteira.png'")
     
+    # Calcula e exibe a rentabilidade
+    rent = carteira.rentabilidade_periodo(data_inicio, data_fim)
+    rent_anual = (1 + rent) ** (1 / 5) - 1  # Taxa anualizada
+    
+    print(f"Valor inicial da carteira: R$ {df['Total'].iloc[0]:.2f}")
+    print(f"Valor final da carteira: R$ {df['Total'].iloc[-1]:.2f}")
+    print(f"Rendimento total: R$ {df['Total'].iloc[-1] - df['Total'].iloc[0]:.2f}")
+    print(f"Rentabilidade total: {rent:.2%}")
+    print(f"Rentabilidade média anual: {rent_anual:.2%}")
+    
+    # Verifica se há dividendos recebidos
+    df_dividendos = carteira.dividendos_to_dataframe()
+    if not df_dividendos.empty:
+        # Total de dividendos
+        total_dividendos = carteira.resultado.total_dividendos
+        print(f"\nTotal de dividendos recebidos: R$ {total_dividendos:.2f}")
+        
+        # Rendimento real considerando reinvestimento dos dividendos
+        valor_final_com_dividendos = df["Total"].iloc[-1] + total_dividendos
+        rendimento_com_dividendos = (valor_final_com_dividendos / df['Total'].iloc[0]) - 1
+        print(f"Rentabilidade considerando reinvestimento dos dividendos: {rendimento_com_dividendos:.2%}")
+        print(f"Rentabilidade média anual com dividendos: {(1 + rendimento_com_dividendos) ** (1 / 5) - 1:.2%}")
+    
     print("\nSimulação concluída!")
 
 

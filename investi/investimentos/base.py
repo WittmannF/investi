@@ -6,6 +6,7 @@ from datetime import date, timedelta
 from enum import Enum
 from typing import Dict, Optional
 from dataclasses import dataclass
+import math
 
 
 class Operador(str, Enum):
@@ -27,6 +28,7 @@ class ResultadoMensal:
     indexador: Optional[float] = None
     taxa_mensal: Optional[float] = None
     juros_pagos: bool = False
+    valor_juros_pagos: float = 0.0  # Valor dos juros pagos neste mês
 
 
 class Investimento:
@@ -148,6 +150,8 @@ class Investimento:
             juros_mes = 0.0
             juros_acumulados = 0.0
             taxa_mensal = 0.0
+            valor_juros_pagos = 0.0
+            valor_corrigido = self.valor_principal  # Valor corrigido monetariamente (sem juros reais)
         else:
             # Caso contrário, aplica os juros
             if not self.historico:
@@ -160,17 +164,38 @@ class Investimento:
                     juros_acumulados=0.0,
                     indexador=None,
                     taxa_mensal=0.0,
-                    juros_pagos=False
+                    juros_pagos=False,
+                    valor_juros_pagos=0.0
                 )
                 self.historico[self.data_inicio] = resultado_inicial
                 valor_atual = self.valor_principal
                 juros_acumulados = 0.0
+                valor_corrigido = self.valor_principal  # Inicializa valor corrigido monetariamente
             else:
                 # Pega o último valor do histórico
                 ultima_data = max(self.historico.keys())
                 ultimo_resultado = self.historico[ultima_data]
                 valor_atual = ultimo_resultado.valor
                 juros_acumulados = ultimo_resultado.juros_acumulados
+                
+                # Determina o valor corrigido (monetariamente atualizado)
+                # Para títulos IPCA+, o valor corrigido seria o principal com o IPCA acumulado
+                # Para outros títulos, o valor corrigido pode ser igual ao principal original
+                if hasattr(self, 'obter_valor_indexador') and self.indexador == 'IPCA' and self.operador == Operador.ADITIVO:
+                    # Para IPCA+, calculamos o valor corrigido
+                    indexador_mes = self.obter_valor_indexador(data)
+                    if valor_atual > self.valor_principal:
+                        # Estima o valor corrigido com base no valor atual e taxa real
+                        # Isso é uma aproximação, idealmente rastrearemos o valor corrigido explicitamente
+                        taxa_real_mensal = math.pow(1 + self.taxa, 1/12) - 1
+                        valor_corrigido = valor_atual / (1 + taxa_real_mensal)
+                        valor_corrigido = valor_corrigido * (1 + indexador_mes)  # Aplica inflação do mês
+                    else:
+                        # Se já pagou juros, o valor_atual é aproximadamente o valor corrigido
+                        valor_corrigido = valor_atual * (1 + indexador_mes)
+                else:
+                    # Para títulos sem correção monetária, o valor corrigido é o principal original
+                    valor_corrigido = self.valor_principal
             
             # Calcula a taxa mensal (pode depender do indexador)
             taxa_mensal = self.obter_taxa_mensal(data)
@@ -181,16 +206,29 @@ class Investimento:
             # Acumula os juros
             juros_acumulados += juros_mes
             
-            # Juros são reinvestidos (entram no valor atual)
+            # Por padrão, juros são reinvestidos (entram no valor atual)
             valor_atual += juros_mes
+            valor_juros_pagos = 0.0
         
         # Flag para juros pagos neste mês
         juros_pagos = False
         
         # Verifica se é necessário pagar juros semestrais
         if self.juros_semestrais and self._eh_mes_pagamento_juros(data) and data != self.data_inicio:
-            # Paga os juros acumulados (não modifica o valor atual, apenas zera os juros acumulados)
+            # Nos títulos com juros semestrais, apenas os juros acumulados são pagos 
+            # mas o valor corrigido pela inflação é mantido
             juros_pagos = True
+            valor_juros_pagos = juros_acumulados  # Registra o valor pago
+            
+            # Ajusta o valor atual: mantém o valor corrigido monetariamente, remove apenas os juros reais
+            if hasattr(self, 'obter_valor_indexador') and self.indexador == 'IPCA' and self.operador == Operador.ADITIVO:
+                # Para IPCA+, devemos manter o valor corrigido pela inflação
+                valor_atual = valor_corrigido
+            else:
+                # Para títulos sem correção monetária, voltamos ao principal
+                valor_atual -= juros_acumulados
+            
+            # Zera os juros acumulados
             juros_acumulados = 0.0
             self.ultimo_pagamento_juros = data
         
@@ -203,7 +241,8 @@ class Investimento:
             juros_acumulados=juros_acumulados,
             indexador=self.obter_valor_indexador(data),
             taxa_mensal=taxa_mensal,
-            juros_pagos=juros_pagos
+            juros_pagos=juros_pagos,
+            valor_juros_pagos=valor_juros_pagos
         )
         
         # Armazena o resultado no histórico

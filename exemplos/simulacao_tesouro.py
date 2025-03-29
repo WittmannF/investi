@@ -125,6 +125,24 @@ def main():
     for titulo, rent in rentabilidades.items():
         print(f"- {titulo}: {rent:.2%}")
     
+    # Exibe informações sobre dividendos/juros semestrais pagos
+    df_dividendos = carteira.dividendos_to_dataframe()
+    
+    if not df_dividendos.empty:
+        print("\nDividendos recebidos (juros semestrais):")
+        # Agrupa os dividendos por ano
+        df_dividendos['Ano'] = pd.DatetimeIndex(df_dividendos.index).year
+        df_dividendos_por_ano = df_dividendos.groupby('Ano').sum()
+        print(df_dividendos_por_ano)
+        
+        # Total de dividendos
+        print(f"\nTotal de dividendos recebidos: R$ {carteira.resultado.total_dividendos:.2f}")
+        
+        # Rendimento real considerando reinvestimento dos dividendos
+        valor_final_com_dividendos = df["Total"].iloc[-1] + carteira.resultado.total_dividendos
+        rendimento_com_dividendos = (valor_final_com_dividendos / (4 * valor_inicial)) - 1
+        print(f"Rendimento total considerando reinvestimento dos dividendos: {rendimento_com_dividendos:.2%}")
+    
     # Visualização
     print("\nVisualizando evolução dos títulos...")
     
