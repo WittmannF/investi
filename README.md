@@ -91,16 +91,13 @@ plt.savefig("evolucao_carteira.png")
 plt.show()
 ```
 
-## Aplicativos Interativos
+## Aplicativo Interativo
 
-O pacote inclui aplicativos Streamlit para uso interativo:
+O pacote inclui uma aplicação Streamlit para uso interativo:
 
 ```bash
-# Interface de página única
-streamlit run streamlit_apps/dashboard.py
-
 # Interface multipage
-streamlit run streamlit_multipage/Home.py
+streamlit run streamlit_app/Home.py
 ```
 
 ## Recursos

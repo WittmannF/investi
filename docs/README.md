@@ -9,7 +9,7 @@ Bem-vindo à documentação do pacote `investi`, uma biblioteca Python para simu
 3. [Como Começar (Getting Started)](#como-começar)
 4. [Tutoriais](#tutoriais)
 5. [Exemplos](#exemplos)
-6. [Aplicativos Streamlit](#aplicativos-streamlit)
+6. [Aplicativo Streamlit](#aplicativo-streamlit)
 7. [Referência da API](#referência-da-api)
 8. [Contribuição](#contribuição)
 
@@ -132,14 +132,19 @@ Diversos exemplos estão disponíveis na pasta `exemplos/` do repositório:
 - `simulacao_aportes.py` - Simulação com aportes regulares
 - `simulacao_cenarios.py` - Simulação com diferentes cenários econômicos
 
-## Aplicativos Streamlit
+## Aplicativo Streamlit
 
-O pacote inclui aplicativos Streamlit para interação visual:
+O pacote inclui um aplicativo Streamlit para interação visual:
 
-- **Interface multipage** - Execute com `streamlit run streamlit_multipage/Home.py`
-  - Simulador de Carteira
-  - Simulador de Aportes
-  - Comparador de Investimentos
+```bash
+# Interface multipage
+streamlit run streamlit_app/Home.py
+```
+
+O aplicativo oferece:
+- Simulador de Carteira (compare diferentes investimentos)
+- Simulador de Aportes (calcule o impacto de aportes regulares)
+- Comparador de Investimentos (análise lado a lado)
 
 ## Referência da API
 
