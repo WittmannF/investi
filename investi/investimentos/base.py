@@ -15,6 +15,14 @@ class Operador(str, Enum):
     ADITIVO = "+"  # Para casos onde o indexador é somado à taxa (ex: IPCA + 5%)
     MULTIPLICADO = "x"  # Para casos onde o indexador é multiplicado pela taxa (ex: 110% do CDI)
 
+class Indexador(str, Enum):
+    """Enum para indexadores utilizados no cálculo de rentabilidade"""
+    
+    IPCA = "IPCA"
+    CDI = "CDI"
+    SELIC = "SELIC"
+    PREFIXADO = "PREFIXADO"
+    POUPANÇA = "POUPANÇA"
 
 @dataclass
 class ResultadoMensal:
@@ -46,8 +54,8 @@ class Investimento:
         data_inicio: date,
         data_fim: date,
         taxa: float = 0.0,
-        operador: Optional[str] = None,
-        indexador: Optional[str] = None,
+        operador: Optional[Operador] = None,
+        indexador: Optional[Indexador] = None,
         moeda: str = "R$",
         juros_semestrais: bool = False
     ):
@@ -106,11 +114,50 @@ class Investimento:
             
         Returns:
             Taxa mensal em formato decimal
-            
-        Raises:
-            NotImplementedError: Este método deve ser implementado pelas classes derivadas
         """
-        raise NotImplementedError("Classes derivadas devem implementar este método")
+        # Para o primeiro mês do investimento, retorna 0
+        if data == self.data_inicio:
+            return 0.0
+            
+        # Para investimentos prefixados
+        if self.indexador == Indexador.PREFIXADO:
+            # Converte a taxa anual para mensal
+            return math.pow(1 + self.taxa, 1/12) - 1
+        
+        # Para investimentos sem indexador (taxa fixa)
+        if self.indexador is None:
+            # Apenas converte a taxa anual para mensal
+            return math.pow(1 + self.taxa, 1/12) - 1
+            
+        try:
+            # Para outros investimentos indexados
+            indexador_valor = self.obter_valor_indexador(data)
+            
+            # Se o indexador for None, trata como taxa fixa
+            if indexador_valor is None:
+                return math.pow(1 + self.taxa, 1/12) - 1
+            
+            # Aplica o operador apropriado
+            if self.operador == Operador.ADITIVO:
+                # Operador aditivo (exemplo: IPCA + 5%)
+                # Converte a taxa real anual para mensal
+                taxa_real_mensal = math.pow(1 + self.taxa, 1/12) - 1
+                # Retorna (1 + indexador) * (1 + taxa_real_mensal) - 1
+                return (1 + indexador_valor) * (1 + taxa_real_mensal) - 1
+            
+            elif self.operador == Operador.MULTIPLICADO:
+                # Operador multiplicativo (exemplo: 110% do CDI)
+                return self.taxa * indexador_valor
+            
+            # Para outros casos
+            else:
+                # Apenas converte a taxa anual para mensal
+                return math.pow(1 + self.taxa, 1/12) - 1
+                
+        except (NotImplementedError, TypeError, ValueError):
+            # Se o método obter_valor_indexador não for implementado ou retornar valor inválido
+            # Retorna uma taxa padrão baseada na taxa anual
+            return math.pow(1 + self.taxa, 1/12) - 1
     
     def obter_valor_indexador(self, data: date) -> float:
         """
@@ -181,7 +228,7 @@ class Investimento:
                 # Determina o valor corrigido (monetariamente atualizado)
                 # Para títulos IPCA+, o valor corrigido seria o principal com o IPCA acumulado
                 # Para outros títulos, o valor corrigido pode ser igual ao principal original
-                if hasattr(self, 'obter_valor_indexador') and self.indexador == 'IPCA' and self.operador == Operador.ADITIVO:
+                if hasattr(self, 'obter_valor_indexador') and self.indexador == Indexador.IPCA and self.operador == Operador.ADITIVO:
                     # Para IPCA+, calculamos o valor corrigido
                     indexador_mes = self.obter_valor_indexador(data)
                     if valor_atual > self.valor_principal:
@@ -221,7 +268,7 @@ class Investimento:
             valor_juros_pagos = juros_acumulados  # Registra o valor pago
             
             # Ajusta o valor atual: mantém o valor corrigido monetariamente, remove apenas os juros reais
-            if hasattr(self, 'obter_valor_indexador') and self.indexador == 'IPCA' and self.operador == Operador.ADITIVO:
+            if hasattr(self, 'obter_valor_indexador') and self.indexador == Indexador.IPCA and self.operador == Operador.ADITIVO:
                 # Para IPCA+, devemos manter o valor corrigido pela inflação
                 valor_atual = valor_corrigido
             else:
@@ -230,7 +277,7 @@ class Investimento:
             
             # Zera os juros acumulados
             juros_acumulados = 0.0
-            self.ultimo_pagamento_juros = data
+            self.ultimo_pagamento_juros = data  # type: ignore
         
         # Cria o resultado mensal
         resultado = ResultadoMensal(
@@ -327,23 +374,27 @@ class Investimento:
             data: Data a ser verificada
             
         Returns:
-            True se for um mês de pagamento, False caso contrário
+            True se for mês de pagamento de juros semestrais, False caso contrário
         """
-        # Se não houver pagamento semestral, retorna False
+        # Verificação: Não há pagamentos semestrais
         if not self.juros_semestrais:
             return False
         
-        # Se for a data de vencimento, também é um mês de pagamento
-        if data.year == self.data_fim.year and data.month == self.data_fim.month:
+        # Verificação: É o mês de vencimento
+        if data.month == self.data_fim.month and data.year == self.data_fim.year:
             return True
         
-        # Se é o primeiro pagamento
+        # Verificação: Primeiro pagamento (seis meses após o início e múltiplo de 6)
         if self.ultimo_pagamento_juros is None:
-            # Verifica se já se passaram 6 meses desde o início
             meses_desde_inicio = (data.year - self.data_inicio.year) * 12 + (data.month - self.data_inicio.month)
-            return meses_desde_inicio >= 6 and meses_desde_inicio % 6 == 0
+            if meses_desde_inicio >= 6 and meses_desde_inicio % 6 == 0:
+                return True
+            # Se não for um mês de pagamento válido para o primeiro pagamento
+            return False
         
-        # Caso contrário, verifica se já se passaram 6 meses desde o último pagamento
+        # Chegamos aqui, então já houve pelo menos um pagamento
+        # Verificação: Pagamentos subsequentes (seis meses após o último)
+        assert self.ultimo_pagamento_juros is not None  # Para o mypy entender que é garantidamente não-None
         meses_desde_ultimo = (data.year - self.ultimo_pagamento_juros.year) * 12 + (data.month - self.ultimo_pagamento_juros.month)
         return meses_desde_ultimo >= 6
     

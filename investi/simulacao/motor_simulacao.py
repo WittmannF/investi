@@ -5,6 +5,10 @@ import matplotlib.pyplot as plt
 from dataclasses import dataclass, field
 
 from investi.investimentos.base import Investimento
+from investi.investimentos.ipca import InvestimentoIPCA
+from investi.investimentos.cdi import InvestimentoCDI
+from investi.investimentos.prefixado import InvestimentoPrefixado
+from investi.investimentos.selic import InvestimentoSelic
 from investi.carteira import Carteira
 
 
@@ -21,6 +25,44 @@ class ConfiguracaoSimulacao:
     valor_aporte: float = 0.0  # Valor do aporte periódico
     cenarios_ipca: Dict[str, Dict[date, float]] = field(default_factory=dict)
     cenarios_cdi: Dict[str, Dict[date, float]] = field(default_factory=dict)
+
+
+class Cenario:
+    """Classe para representar um cenário de simulação"""
+    
+    def __init__(self, nome: str, descricao: Optional[str] = None):
+        """
+        Inicializa um cenário
+        
+        Args:
+            nome: Nome do cenário
+            descricao: Descrição detalhada do cenário
+        """
+        self.nome = nome
+        self.descricao = descricao
+        self.ajustes_taxa: Dict[str, float] = {}  # Ajustes de taxa por investimento
+    
+    def aplicar_a_carteira(self, carteira: Carteira) -> None:
+        """
+        Aplica os ajustes do cenário à carteira
+        
+        Args:
+            carteira: Carteira a ser ajustada
+        """
+        # Aplica ajustes de taxa a investimentos específicos
+        for nome_investimento, ajuste in self.ajustes_taxa.items():
+            if nome_investimento in carteira.investimentos:
+                carteira.investimentos[nome_investimento].taxa += ajuste
+    
+    def adicionar_ajuste_taxa(self, nome_investimento: str, ajuste: float) -> None:
+        """
+        Adiciona um ajuste de taxa para um investimento específico
+        
+        Args:
+            nome_investimento: Nome do investimento a ser ajustado
+            ajuste: Valor do ajuste da taxa (positivo ou negativo)
+        """
+        self.ajustes_taxa[nome_investimento] = ajuste
 
 
 class MotorSimulacao:
@@ -42,7 +84,7 @@ class MotorSimulacao:
             data_inicio=date.today(),
             data_fim=date(date.today().year + 1, date.today().month, date.today().day)
         )
-        self.resultados = {}
+        self.resultados: Dict[str, pd.DataFrame] = {}
     
     def simular(self, cenario: str = "base") -> pd.DataFrame:
         """
@@ -89,7 +131,7 @@ class MotorSimulacao:
         Returns:
             Dicionário de cenários -> DataFrame com resultados
         """
-        resultados = {}
+        resultados: Dict[str, pd.DataFrame] = {}
         
         for cenario in cenarios:
             # Faz uma cópia da carteira para não afetar simulações anteriores
@@ -163,7 +205,7 @@ class MotorSimulacao:
             print("Nenhum cenário foi simulado ainda")
             return pd.DataFrame()
         
-        dados = []
+        dados: List[Dict[str, Any]] = []
         
         for cenario, df in self.resultados.items():
             # Obtém os valores inicial e final
@@ -247,8 +289,9 @@ class MotorSimulacao:
         # Adiciona cópias dos investimentos
         for nome, investimento in self.carteira.investimentos.items():
             # Cria uma nova instância baseada no tipo do investimento original
-            if investimento.__class__.__name__ == "InvestimentoIPCA":
-                from investi.investimentos import InvestimentoIPCA
+            novo_investimento: Investimento
+            
+            if isinstance(investimento, InvestimentoIPCA):
                 novo_investimento = InvestimentoIPCA(
                     nome=investimento.nome,
                     valor_principal=investimento.valor_principal,
@@ -258,18 +301,18 @@ class MotorSimulacao:
                     moeda=investimento.moeda,
                     juros_semestrais=investimento.juros_semestrais
                 )
-            elif investimento.__class__.__name__ == "InvestimentoCDI":
-                from investi.investimentos import InvestimentoCDI
+            elif isinstance(investimento, InvestimentoCDI):
                 novo_investimento = InvestimentoCDI(
                     nome=investimento.nome,
                     valor_principal=investimento.valor_principal,
                     data_inicio=investimento.data_inicio,
                     data_fim=investimento.data_fim,
                     taxa=investimento.taxa,
-                    moeda=investimento.moeda
+                    operador=investimento.operador,
+                    moeda=investimento.moeda,
+                    juros_semestrais=getattr(investimento, 'juros_semestrais', False)
                 )
-            elif investimento.__class__.__name__ == "InvestimentoPrefixado":
-                from investi.investimentos import InvestimentoPrefixado
+            elif isinstance(investimento, InvestimentoPrefixado):
                 novo_investimento = InvestimentoPrefixado(
                     nome=investimento.nome,
                     valor_principal=investimento.valor_principal,
@@ -279,21 +322,128 @@ class MotorSimulacao:
                     moeda=investimento.moeda,
                     juros_semestrais=investimento.juros_semestrais
                 )
-            elif investimento.__class__.__name__ == "InvestimentoSelic":
-                from investi.investimentos import InvestimentoSelic
+            elif isinstance(investimento, InvestimentoSelic):
                 novo_investimento = InvestimentoSelic(
                     nome=investimento.nome,
                     valor_principal=investimento.valor_principal,
                     data_inicio=investimento.data_inicio,
                     data_fim=investimento.data_fim,
                     taxa=investimento.taxa,
-                    moeda=investimento.moeda
+                    moeda=investimento.moeda,
+                    juros_semestrais=getattr(investimento, 'juros_semestrais', False)
                 )
             else:
-                # Fallback para tipos desconhecidos (não ideal, mas funcional)
-                # Na prática, seria melhor ter um método clone() em cada classe
-                novo_investimento = investimento  # Usa referência como último recurso
+                # Fallback para tipos desconhecidos
+                novo_tipo = type(investimento)
+                novo_investimento = novo_tipo(
+                    nome=investimento.nome,
+                    valor_principal=investimento.valor_principal,
+                    data_inicio=investimento.data_inicio,
+                    data_fim=investimento.data_fim,
+                    taxa=investimento.taxa,
+                    moeda=investimento.moeda,
+                    juros_semestrais=getattr(investimento, 'juros_semestrais', False)
+                )
             
             nova_carteira.adicionar_investimento(novo_investimento)
         
-        return nova_carteira 
+        return nova_carteira
+
+    def simular_cenario(self, cenario: Cenario) -> Dict[date, Dict[str, float]]:
+        """
+        Simula a evolução da carteira em um cenário específico
+        
+        Args:
+            cenario: Cenário a ser simulado
+            
+        Returns:
+            Dicionário com os resultados consolidados mês a mês
+        """
+        # Copia a carteira para não modificar a original
+        carteira_cenario = self._copiar_carteira()
+        
+        # Aplica as modificações do cenário
+        cenario.aplicar_a_carteira(carteira_cenario)
+        
+        # Simula a evolução da carteira no cenário
+        resultado = carteira_cenario.simular(self.config.data_inicio, self.config.data_fim)
+        
+        # Armazena o resultado consolidado
+        resultados: Dict[date, Dict[str, float]] = {}
+        for data, valores in resultado.resultado_mensal.items():
+            resultados[data] = valores
+        
+        return resultados
+
+    def _copiar_investimento_para_cenario(self, investimento: Investimento, cenario_nome: str, ajuste_taxa: float = 0.0) -> Investimento:
+        """
+        Cria uma cópia independente de um investimento para um cenário específico
+        
+        Args:
+            investimento: Investimento original
+            cenario_nome: Nome do cenário
+            ajuste_taxa: Ajuste a ser aplicado na taxa do investimento
+            
+        Returns:
+            Cópia do investimento com ajustes para o cenário
+        """
+        # Calcula a nova taxa
+        taxa_ajustada = investimento.taxa * (1 + ajuste_taxa)
+        
+        # Cria um novo investimento do mesmo tipo com os mesmos dados
+        if isinstance(investimento, InvestimentoIPCA):
+            return InvestimentoIPCA(
+                nome=f"{investimento.nome} ({cenario_nome})",
+                valor_principal=investimento.valor_principal,
+                data_inicio=investimento.data_inicio,
+                data_fim=investimento.data_fim,
+                taxa=taxa_ajustada,
+                moeda=investimento.moeda,
+                juros_semestrais=investimento.juros_semestrais
+            )
+        
+        elif isinstance(investimento, InvestimentoCDI):
+            return InvestimentoCDI(
+                nome=f"{investimento.nome} ({cenario_nome})",
+                valor_principal=investimento.valor_principal,
+                data_inicio=investimento.data_inicio,
+                data_fim=investimento.data_fim,
+                taxa=taxa_ajustada,
+                operador=investimento.operador,
+                moeda=investimento.moeda,
+                juros_semestrais=investimento.juros_semestrais
+            )
+        
+        elif isinstance(investimento, InvestimentoPrefixado):
+            return InvestimentoPrefixado(
+                nome=f"{investimento.nome} ({cenario_nome})",
+                valor_principal=investimento.valor_principal,
+                data_inicio=investimento.data_inicio,
+                data_fim=investimento.data_fim,
+                taxa=taxa_ajustada,
+                moeda=investimento.moeda,
+                juros_semestrais=investimento.juros_semestrais
+            )
+        
+        elif isinstance(investimento, InvestimentoSelic):
+            return InvestimentoSelic(
+                nome=f"{investimento.nome} ({cenario_nome})",
+                valor_principal=investimento.valor_principal,
+                data_inicio=investimento.data_inicio,
+                data_fim=investimento.data_fim,
+                taxa=taxa_ajustada,
+                moeda=investimento.moeda,
+                juros_semestrais=investimento.juros_semestrais
+            )
+        
+        # Para outros tipos de investimento
+        else:
+            return type(investimento)(
+                nome=f"{investimento.nome} ({cenario_nome})",
+                valor_principal=investimento.valor_principal,
+                data_inicio=investimento.data_inicio,
+                data_fim=investimento.data_fim,
+                taxa=taxa_ajustada,
+                moeda=investimento.moeda,
+                juros_semestrais=investimento.juros_semestrais
+            ) 

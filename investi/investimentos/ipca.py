@@ -2,13 +2,16 @@ from datetime import date
 from typing import Dict, Optional
 import math
 
-from investi.investimentos.base import Investimento, Operador
+from investi.investimentos.base import Investimento, Operador, Indexador
+from investi.dados.ipca import IPCADados
 
 class InvestimentoIPCA(Investimento):
     """
-    Implementação de investimento atrelado ao IPCA.
-    Normalmente representado como IPCA + taxa (ex: IPCA + 7.9% a.a.)
+    Implementação de investimento corrigido pelo IPCA (Tesouro IPCA+, por exemplo)
     """
+    
+    # Dados de IPCA (serão carregados apenas uma vez)
+    ipca_dados = IPCADados()
     
     def __init__(
         self,
@@ -18,86 +21,44 @@ class InvestimentoIPCA(Investimento):
         data_fim: date,
         taxa: float,
         moeda: str = 'BRL',
-        juros_semestrais: bool = False,
-        fonte_ipca: Optional[Dict[date, float]] = None
+        juros_semestrais: bool = False
     ):
         """
-        Inicializa um investimento indexado ao IPCA
+        Inicializa um investimento IPCA+
         
         Args:
             nome: Nome do investimento
             valor_principal: Valor inicial investido
             data_inicio: Data de início do investimento
             data_fim: Data de vencimento do investimento
-            taxa: Taxa do investimento ao ano (em decimal, ex: 0.079 para 7.9%)
+            taxa: Taxa real de juros anual (em decimal, ex: 0.05 para IPCA + 5%)
             moeda: Moeda do investimento (default: 'BRL')
             juros_semestrais: Se True, paga juros semestralmente
-            fonte_ipca: Dicionário com valores do IPCA por data (opcional)
         """
+        # Taxa é adicionada ao IPCA, então operador é '+'
         super().__init__(
             nome=nome,
             valor_principal=valor_principal,
             data_inicio=data_inicio,
             data_fim=data_fim,
             moeda=moeda,
-            indexador='IPCA',
             taxa=taxa,
-            operador=Operador.ADITIVO,  # IPCA sempre usa operador aditivo
+            indexador=Indexador.IPCA,
+            operador=Operador.ADITIVO,  # IPCA+ usa operador aditivo
             juros_semestrais=juros_semestrais
         )
-        
-        # Fonte de dados do IPCA (pode ser substituída posteriormente)
-        self.fonte_ipca = fonte_ipca or {}
-        
-        # Para testes ou simulações iniciais, valores padrão
-        self._ipca_padrao_mensal = 0.004  # 0.4% ao mês (aproximadamente 5% ao ano)
     
     def obter_valor_indexador(self, data: date) -> float:
         """
-        Obtém o valor do IPCA para uma determinada data
+        Obtém o valor do IPCA para o mês correspondente à data
         
         Args:
-            data: Data para obter o valor do IPCA
+            data: Data para a qual se deseja o valor do IPCA
             
         Returns:
-            Valor do IPCA mensal
+            Valor do IPCA mensal em formato decimal
         """
-        # Se tiver na fonte de dados, retorna o valor
-        if data in self.fonte_ipca:
-            return self.fonte_ipca[data]
-        
-        # Caso contrário, retorna valor padrão
-        # Em uma implementação real, poderia buscar de uma API ou banco de dados
-        return self._ipca_padrao_mensal
-    
-    def obter_taxa_mensal(self, data: date) -> float:
-        """
-        Calcula a taxa mensal total (IPCA + spread) para uma data
-        
-        Args:
-            data: Data para cálculo da taxa
-            
-        Returns:
-            Taxa mensal total em decimal
-        """
-        # Obtem valor do IPCA mensal
-        ipca_mensal = self.obter_valor_indexador(data)
-        
-        # Converte a taxa anual para mensal
-        # Usando a fórmula: (1 + taxa_anual)^(1/12) - 1
-        taxa_mensal = math.pow(1 + self.taxa, 1/12) - 1
-        
-        # IPCA+ é operador aditivo: IPCA + taxa
-        return ipca_mensal + taxa_mensal
-    
-    def definir_fonte_ipca(self, fonte_ipca: Dict[date, float]):
-        """
-        Define uma nova fonte de dados do IPCA
-        
-        Args:
-            fonte_ipca: Dicionário com valores do IPCA por data
-        """
-        self.fonte_ipca = fonte_ipca
+        return self.ipca_dados.obter_ipca_mensal(data)
     
     def __str__(self) -> str:
         return (
